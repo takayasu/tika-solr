@@ -1,0 +1,90 @@
+apply plugin: 'jacoco'
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+// エンコーディング
+def defaultEncoding = 'UTF-8'
+[compileJava, compileTestJava]*.options*.encoding = defaultEncoding
+
+// ソースと実行ファイルのJava バージョン
+def jdkVersion = 1.8
+sourceCompatibility = jdkVersion
+targetCompatibility = jdkVersion
+
+// 依存関係の解決
+repositories {
+    mavenCentral()
+    maven {
+    		url 'https://oss.sonatype.org/content/repositories/snapshots/'
+    	   	url 'https://plugins.gradle.org/m2/'
+   	}
+}
+
+// 依存ライブラリの設定
+dependencies {
+	compile group: 'org.apache.solr', name: 'solr-solrj', version: '6.2.1'
+
+    compile 'commons-cli:commons-cli:1.3.1'
+    compile 'org.apache.commons:commons-csv:1.2'
+	compile group: 'org.apache.tika', name: 'tika-parsers', version: '1.13'
+	
+	compile group: 'junit', name: 'junit', version: '4.12'
+    
+}
+
+// eclipse プロジェクトの設定
+import org.gradle.plugins.ide.eclipse.model.SourceFolder
+eclipse {
+    // .project の設定
+    project {
+        // Gradle nature を追加
+        natures 'org.springsource.ide.eclipse.gradle.core.nature'
+    }
+
+    // gradleで取得したjarのパスを絶対パスにしない
+    // 事前に GRADLE_USER_HOME を設定しておく必要がある
+    // Windows: [ウィンドウ]->[設定] を開く
+    // Mac    : [Eclipse]->[環境設定]を開く
+    // 設定ウィンドウが開いたら [Java]->[ビルド・パス]->[クラスパス変数] を選択する
+    // [新規]ボタンを押下して [名前]:GRADLE_USER_HOME, [パス]:gradleを配置したパス を設定する
+    pathVariables 'GRADLE_USER_HOME': gradle.gradleUserHomeDir
+
+    // .classpath の設定
+    classpath {
+        // 依存している jar の source と javadoc をダウンロードする
+        downloadSources = true    // デフォルトは false
+        downloadJavadoc = true    // javadoc のパスは絶対パスになる
+
+        file {
+            // ソースパスの設定を削除
+            beforeMerged { classpath ->
+                // classpath.entries.clear()
+                classpath.entries.removeAll { it.kind == "src" }
+            }
+
+            // 出力パスを gradle のデフォルトに合わせる
+            whenMerged { classpath ->
+                classpath.entries.findAll { it instanceof SourceFolder && it.path.startsWith("src/main/java")      }*.output = "build/classes/main"
+                classpath.entries.findAll { it instanceof SourceFolder && it.path.startsWith("src/main/resources") }*.output = "build/resources/main"
+                classpath.entries.findAll { it instanceof SourceFolder && it.path.startsWith("src/test/java")      }*.output = "build/classes/test"
+                classpath.entries.findAll { it instanceof SourceFolder && it.path.startsWith("src/test/resources") }*.output = "build/resources/test"
+
+            }
+        }
+    }
+
+    // .settings/org.eclipse.jdt.core.prefs の設定
+    // eclipse側で設定を変更したあと cleanEclipse* タスクを実行すると、その変更は失われる
+    // eclipseJdt だけを実行すれば、eclipse側で変更した設定はマージされる
+    jdt {
+        // 毎回固定の設定を行う場合は下記のようにする(テンプレは自前で用意しておく)
+        /*
+        file {
+            def props = new Properties()
+            props.load(new FileInputStream("${projectDir}/template/org.eclipse.jdt.core.prefs"))
+            withProperties { properties -> properties.putAll(props) }
+        }
+        */
+    }
+
+}
